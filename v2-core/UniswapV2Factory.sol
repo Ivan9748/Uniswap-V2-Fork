@@ -1,19 +1,24 @@
 pragma solidity =0.5.16;
 
 import './interfaces/IUniswapV2Factory.sol';
+import './interfaces/IUniswapV2Reward.sol';
 import './UniswapV2Pair.sol';
+import './UniswapV2Reward.sol';
 
 contract UniswapV2Factory is IUniswapV2Factory {
     address public feeTo;
     address public feeToSetter;
+
+    bytes32 public constant INIT_CODE_HASH = keccak256(abi.encodePacked(type(UniswapV2Pair).creationCode));
 
     mapping(address => mapping(address => address)) public getPair;
     address[] public allPairs;
 
     event PairCreated(address indexed token0, address indexed token1, address pair, uint);
 
-    constructor(address _feeToSetter) public {
+    constructor(address _feeToSetter, address _WETH, address _myToken, uint _threshold) public {
         feeToSetter = _feeToSetter;
+        feeTo = address(new UniswapV2Reward(address(this), _WETH, _feeToSetter, _myToken, _threshold));
     }
 
     function allPairsLength() external view returns (uint) {
@@ -37,8 +42,10 @@ contract UniswapV2Factory is IUniswapV2Factory {
         emit PairCreated(token0, token1, pair, allPairs.length);
     }
 
+    // FeeTo must be IUniswapV2Reward contract
     function setFeeTo(address _feeTo) external {
         require(msg.sender == feeToSetter, 'UniswapV2: FORBIDDEN');
+        require(IUniswapV2Reward(_feeTo).factory() == address(this), 'UniswapV2: WRONG_FACTORY');
         feeTo = _feeTo;
     }
 
