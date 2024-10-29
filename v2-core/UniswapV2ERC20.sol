@@ -6,11 +6,13 @@ import './libraries/SafeMath.sol';
 contract UniswapV2ERC20 is IUniswapV2ERC20 {
     using SafeMath for uint;
 
-    string public constant name = 'Uniswap V2';
-    string public constant symbol = 'UNI-V2';
+    string public constant name = 'Testswap V2';
+    string public constant symbol = 'TEST-V2';
     uint8 public constant decimals = 18;
     uint  public totalSupply;
     mapping(address => uint) public balanceOf;
+    mapping(address => uint) public indexOf;
+    address[] public addresses;
     mapping(address => mapping(address => uint)) public allowance;
 
     bytes32 public DOMAIN_SEPARATOR;
@@ -37,15 +39,41 @@ contract UniswapV2ERC20 is IUniswapV2ERC20 {
         );
     }
 
+    function getAddresses() view external returns(address[] memory){
+        return addresses;
+    }
+
+    function addAddress(address _address) private{
+        if (indexOf[_address] == 0) {
+            addresses.push(_address);
+            indexOf[_address] = addresses.length - 1;
+        }
+    }
+
+    function removeAddress(address _address) private{
+        if(balanceOf[_address] == 0){
+            uint256 index = indexOf[_address];
+            address lastAddress = addresses[addresses.length - 1]; // Останній елемент
+
+            addresses[index] = lastAddress; // Замінюємо видалену адресу останньою
+            indexOf[lastAddress] = index; // Оновлюємо індекс для переміщеного елемента
+
+            addresses.pop(); // Видаляємо останній елемент
+            delete indexOf[_address]; // Видаляємо індекс зі `mapping`
+        }
+    }
+
     function _mint(address to, uint value) internal {
         totalSupply = totalSupply.add(value);
         balanceOf[to] = balanceOf[to].add(value);
+        addAddress(to);
         emit Transfer(address(0), to, value);
     }
 
     function _burn(address from, uint value) internal {
         balanceOf[from] = balanceOf[from].sub(value);
         totalSupply = totalSupply.sub(value);
+        removeAddress(from);
         emit Transfer(from, address(0), value);
     }
 
@@ -56,7 +84,9 @@ contract UniswapV2ERC20 is IUniswapV2ERC20 {
 
     function _transfer(address from, address to, uint value) private {
         balanceOf[from] = balanceOf[from].sub(value);
+        removeAddress(from);
         balanceOf[to] = balanceOf[to].add(value);
+        addAddress(to);
         emit Transfer(from, to, value);
     }
 
