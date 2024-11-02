@@ -10,7 +10,7 @@ interface IUniswapV2Pair {
     function totalSupply() external view returns (uint);
     function balanceOf(address owner) external view returns (uint);
     function allowance(address owner, address spender) external view returns (uint);
-    function getAddresses() view external returns(address[] memory);
+    function getAddresses() external view returns(address[] memory);
 
     function approve(address spender, uint value) external returns (bool);
     function transfer(address to, uint value) external returns (bool);
