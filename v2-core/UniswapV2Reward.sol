@@ -1,7 +1,7 @@
 pragma solidity =0.5.16;
 
+import './UniswapV2Pair.sol';
 import './interfaces/IUniswapV2Reward.sol';
-import './interfaces/IUniswapV2Pair.sol';
 import './interfaces/IUniswapV2Factory.sol';
 import './interfaces/IUniswapV2ERC20.sol';
 import './interfaces/IERC20.sol';
@@ -9,7 +9,6 @@ import './interfaces/IERC20.sol';
 import './libraries/SafeMath.sol';
 import './libraries/UniswapV2Library.sol';
 
-// is IUniswapV2Reward
 contract UniswapV2Reward is IUniswapV2Reward{
     using SafeMath for uint;
 
@@ -30,19 +29,8 @@ contract UniswapV2Reward is IUniswapV2Reward{
         threshold = _threshold;
     }
 
-//
-//                                       Does _token = myToken?
-//                                                |  no
-//                      yes          Pair(_token, myToken) exists?     no
-//              /----------------------------/      \--------------------------\
-//      Check the reserves                                    yes       Pair(_token, WETH) exists?
-//                                                          /--------------/        \---------------\
-//                                    yes     Pair(myToken, WETH) exists?    no                   revert 
-//                                  /------------/                      \----------\
-//                        Check the reserves                                      revert
-//
     function check(address _token, uint _amount) external returns(bool result){
-        require(IUniswapV2Pair(msg.sender).factory() == factory, "Not allowed");
+        require(UniswapV2Pair(msg.sender).factory() == factory, "Not allowed");
 
         if(_token != myToken){
             if(IUniswapV2Factory(factory).getPair(_token, myToken) == address(0)){
@@ -58,14 +46,14 @@ contract UniswapV2Reward is IUniswapV2Reward{
                             amountWETHOut = _amount.mul(reserveOut) / reserveIn.add(_amount);
                             (address token0, ) = UniswapV2Library.sortTokens(_token, WETH);
                             (uint amount0Out, uint amount1Out) = _token == token0 ? (uint(0), amountWETHOut) : (amountWETHOut, uint(0));
-                            if(amount0Out < reserveIn && amount1Out < reserveOut) return false;
+                            if(amount0Out > reserveIn && amount1Out > reserveOut) return false;
                         }
 
                         (uint reserveIn, uint reserveOut) = UniswapV2Library.getReserves(factory, myToken, WETH);
                         uint amountOut = amountWETHOut.mul(reserveOut) / reserveIn.add(amountWETHOut);
                         (address token0, ) = UniswapV2Library.sortTokens(myToken, WETH);
                         (uint amount0Out, uint amount1Out) = WETH == token0 ? (uint(0), amountOut) : (amountOut, uint(0));
-                        if(amount0Out < reserveIn && amount1Out < reserveOut) return false;
+                        if(amount0Out > reserveIn && amount1Out > reserveOut) return false;
                     }
                 }
             } else{
@@ -73,17 +61,16 @@ contract UniswapV2Reward is IUniswapV2Reward{
                 uint amountOut = _amount.mul(reserveOut) / reserveIn.add(_amount);
                 (address token0, ) = UniswapV2Library.sortTokens(_token, myToken);
                 (uint amount0Out, uint amount1Out) = _token == token0 ? (uint(0), amountOut) : (amountOut, uint(0));
-                if(amount0Out < reserveIn && amount1Out < reserveOut) return false;
+                if(amount0Out > reserveIn && amount1Out > reserveOut) return false;
             }
         }
 
         result = true;
     }
 
-    // One of the ways to reduce gas, just change fee to 1, 1.5, 2 or 2.5%
-    // Function check always been called before buyBack
     function buyBack(address _token, uint _amount) external {
-        require(IUniswapV2Pair(msg.sender).factory() == factory, "Not allowed");
+        require(UniswapV2Pair(msg.sender).factory() == factory, "Not allowed");
+        //require(IUniswapV2Pair(msg.sender).factory() == factory, "Not allowed");
 
         if (_token == myToken){
             feeBalances[msg.sender] = feeBalances[msg.sender].add(_amount);
@@ -136,27 +123,25 @@ contract UniswapV2Reward is IUniswapV2Reward{
         }
     }
 
-    // People can add lq specially to recieve rewards in tokens and then recieve
     function distribute(address _pair) private {
         address[] memory holders = IUniswapV2ERC20(_pair).getAddresses();
 
         for(uint i; i < holders.length; i++){
             // amount = balance/supply * fee
-            uint amount = IUniswapV2Pair(_pair).balanceOf(holders[i]) / IUniswapV2Pair(_pair).totalSupply().mul(feeBalances[_pair]);
+            uint amount = IUniswapV2Pair(_pair).balanceOf(holders[i]) / IUniswapV2Pair(_pair).totalSupply();
             IERC20(myToken).transfer(holders[i], amount);
         }
         reserve = reserve.sub(feeBalances[_pair]);
         feeBalances[_pair] = 0;
     }
 
-    function callDistribute(address pair) external {
+    function callDistribute(address pair) public {
         require(msg.sender == owner, "Not the owner!");
         distribute(pair);
     }
 
-    function setThreshold(uint _threshold) external {
+    function setThreshold(uint _threshold) public {
         require(msg.sender == owner, "Not the owner!");
         threshold = _threshold;
     }
-
 }
