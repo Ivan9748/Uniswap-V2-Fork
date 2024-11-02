@@ -39,7 +39,7 @@ contract UniswapV2ERC20 is IUniswapV2ERC20 {
         );
     }
 
-    function getAddresses() view external returns(address[] memory){
+    function getAddresses() external view returns(address[] memory){
         return addresses;
     }
 
